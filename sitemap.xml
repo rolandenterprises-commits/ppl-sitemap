@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- generated 2026-06-12T18:40:43.517Z | 0 posts + 9 pages -->
-<!-- DEBUG sites=1 perBlog=[w34xWyyTQYuiI8qkNL1l:0,w34xWyyTQYuil8qkNL1l:0] rawPosts=0 live=0 fields=[none] -->
+<!-- generated 2026-06-12T18:44:22.091Z | 1 posts + 9 pages -->
+<!-- DEBUG method=scrape sites=1 blogIds=[w34xWyyTQYuiI8qkNL1l] apiPosts=0 postUrls=1 apiResp=[422:{&quot;status&quot;:422,&quot;options&quot;:{},&quot;message&quot;:[&quot;property skip should not exist&quot;],&quot;name&quot;:&quot;UnprocessableEntityException&quot;,&quot;error&quot;:&quot;Unprocessable Entity&quot;] -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://powerpokerleague.com/</loc>
@@ -37,5 +37,9 @@
   <url>
     <loc>https://powerpokerleague.com/refer</loc>
     <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://powerpokerleague.com/post/how-to-start-a-poker-league</loc>
+    <priority>0.7</priority>
   </url>
 </urlset>
