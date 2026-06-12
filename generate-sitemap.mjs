@@ -2,7 +2,7 @@ import { writeFileSync } from "node:fs";
 
 const SITE = "https://powerpokerleague.com";
 const LOCATION_ID = "CMYhTqPA2atsodEaQLzH";
-let BLOG_ID = "w34xWyyTQYuil8qkNL1l"; // fallback; auto-discovered below
+const EXTRA_BLOG_IDS = ["w34xWyyTQYuil8qkNL1l"];
 const POST_PATH = "/post/";
 const TOKEN = process.env.GHL_TOKEN;
 const API = "https://services.leadconnectorhq.com";
@@ -24,19 +24,18 @@ async function api(path) {
   return { ok: res.ok, status: res.status, json, text };
 }
 
-async function discoverBlogId() {
+async function getSites() {
   const r = await api(`/blogs/site/all?locationId=${LOCATION_ID}&skip=0&limit=50`);
-  if (!r.ok) { console.log(`[discover] /blogs/site/all -> ${r.status}: ${r.text.slice(0,300)}`); return null; }
-  const sites = r.json?.data || r.json?.blogs || r.json?.sites || [];
-  console.log(`[discover] found ${sites.length} blog site(s): ` + sites.map((s)=>`${s._id||s.id}="${s.name||s.title||""}"`).join(" | "));
-  return sites[0]?._id || sites[0]?.id || null;
+  if (!r.ok) { console.log(`[sites] ${r.status}: ${r.text.slice(0,200)}`); return []; }
+  const arr = r.json?.data || r.json?.blogs || r.json?.sites || [];
+  return arr.map((s) => ({ id: s._id || s.id || s.blogId, name: s.name || s.title || "" }));
 }
 
-async function fetchAllPosts(blogId) {
+async function getPosts(blogId) {
   const limit = 50; let offset = 0; const out = [];
   for (;;) {
     const r = await api(`/blogs/posts/all?locationId=${LOCATION_ID}&blogId=${blogId}&limit=${limit}&offset=${offset}`);
-    if (!r.ok) throw new Error(`GHL posts API ${r.status} (blogId=${blogId}): ${r.text.slice(0,300)}`);
+    if (!r.ok) { console.log(`[posts] blog ${blogId} -> ${r.status}: ${r.text.slice(0,150)}`); break; }
     const batch = r.json?.blogs || r.json?.posts || r.json?.data || [];
     out.push(...batch);
     if (batch.length < limit) break;
@@ -45,9 +44,10 @@ async function fetchAllPosts(blogId) {
   return out;
 }
 
+const slugOf = (p) => p.urlSlug || p.url_slug || p.slug || p.seoSlug || p.path || "";
 function isLive(p) {
-  const status = (p.status || "").toUpperCase();
-  if (status && status !== "PUBLISHED") return false;
+  const st = (p.status || "").toUpperCase();
+  if (st && st !== "PUBLISHED") return false;
   const pub = p.publishedAt || p.published_at || p.publishedDate;
   if (pub && new Date(pub).getTime() > Date.now()) return false;
   return true;
@@ -55,18 +55,23 @@ function isLive(p) {
 
 const now = new Date().toISOString();
 
-const discovered = await discoverBlogId();
-if (discovered) { console.log(`[discover] using blogId=${discovered}`); BLOG_ID = discovered; }
-else { console.log(`[discover] could not auto-discover; falling back to blogId=${BLOG_ID}`); }
+const sites = await getSites();
+console.log(`[sites] ${sites.length}: ` + sites.map((s) => `${s.id}="${s.name}"`).join(" | "));
 
-let posts = [];
-try { posts = await fetchAllPosts(BLOG_ID); }
-catch (e) { console.error("Failed to fetch GHL posts:", e.message); process.exit(1); }
+const blogIds = [...new Set([...sites.map((s) => s.id).filter(Boolean), ...EXTRA_BLOG_IDS])];
+let allPosts = [];
+const perBlog = [];
+for (const id of blogIds) {
+  const ps = await getPosts(id);
+  perBlog.push(`${id}:${ps.length}`);
+  allPosts.push(...ps);
+}
+console.log(`[posts] per-blog: ${perBlog.join(", ")} | total=${allPosts.length}`);
+const sampleFields = allPosts[0] ? Object.keys(allPosts[0]).join("|") : "none";
+console.log(`[posts] sample fields: ${sampleFields}`);
 
-if (posts[0]) console.log(`[posts] sample fields:`, Object.keys(posts[0]).join(", "));
-
-const postUrls = posts.filter(isLive).map((p) => {
-  const slug = p.urlSlug || p.url_slug || p.slug;
+const postUrls = allPosts.filter(isLive).map((p) => {
+  const slug = slugOf(p);
   if (!slug) return null;
   const lm = p.updatedAt || p.updated_at || p.publishedAt || p.published_at;
   return { loc: SITE + POST_PATH + slug, lastmod: lm ? new Date(lm).toISOString() : null, priority: "0.7" };
@@ -80,8 +85,11 @@ const xmlBody = urls.map((u) =>
   `    <priority>${u.priority}</priority>\n` + "  </url>"
 ).join("\n");
 
+const debug = `sites=${sites.length} perBlog=[${perBlog.join(",")}] rawPosts=${allPosts.length} live=${postUrls.length} fields=[${sampleFields}]`;
+
 const xml = `<?xml version="1.0" encoding="UTF-8"?>\n` +
   `<!-- generated ${now} | ${postUrls.length} posts + ${STATIC.length} pages -->\n` +
+  `<!-- DEBUG ${esc(debug)} -->\n` +
   `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${xmlBody}\n</urlset>\n`;
 
 writeFileSync("sitemap.xml", xml);
