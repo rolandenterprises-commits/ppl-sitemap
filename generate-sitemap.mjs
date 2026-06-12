@@ -2,9 +2,10 @@ import { writeFileSync } from "node:fs";
 
 const SITE = "https://powerpokerleague.com";
 const LOCATION_ID = "CMYhTqPA2atsodEaQLzH";
-const BLOG_ID = "w34xWyyTQYuil8qkNL1l";
+let BLOG_ID = "w34xWyyTQYuil8qkNL1l"; // fallback; auto-discovered below
 const POST_PATH = "/post/";
 const TOKEN = process.env.GHL_TOKEN;
+const API = "https://services.leadconnectorhq.com";
 
 const STATIC = [
   ["/", "1.0"], ["/how-it-works", "0.8"], ["/features", "0.8"], ["/pricing", "0.9"],
@@ -13,16 +14,30 @@ const STATIC = [
 
 if (!TOKEN) { console.error("ERROR: GHL_TOKEN secret is not set."); process.exit(1); }
 
+const HEADERS = { Authorization: `Bearer ${TOKEN}`, Version: "2021-07-28", Accept: "application/json" };
 const esc = (s) => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 
-async function fetchAllPosts() {
+async function api(path) {
+  const res = await fetch(API + path, { headers: HEADERS });
+  const text = await res.text();
+  let json = null; try { json = JSON.parse(text); } catch {}
+  return { ok: res.ok, status: res.status, json, text };
+}
+
+async function discoverBlogId() {
+  const r = await api(`/blogs/site/all?locationId=${LOCATION_ID}&skip=0&limit=50`);
+  if (!r.ok) { console.log(`[discover] /blogs/site/all -> ${r.status}: ${r.text.slice(0,300)}`); return null; }
+  const sites = r.json?.data || r.json?.blogs || r.json?.sites || [];
+  console.log(`[discover] found ${sites.length} blog site(s): ` + sites.map((s)=>`${s._id||s.id}="${s.name||s.title||""}"`).join(" | "));
+  return sites[0]?._id || sites[0]?.id || null;
+}
+
+async function fetchAllPosts(blogId) {
   const limit = 50; let offset = 0; const out = [];
   for (;;) {
-    const url = `https://services.leadconnectorhq.com/blogs/posts/all?locationId=${LOCATION_ID}&blogId=${BLOG_ID}&limit=${limit}&offset=${offset}`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${TOKEN}`, Version: "2021-07-28", Accept: "application/json" } });
-    if (!res.ok) throw new Error(`GHL API ${res.status}: ${(await res.text()).slice(0,400)}`);
-    const data = await res.json();
-    const batch = data.blogs || data.posts || data.data || [];
+    const r = await api(`/blogs/posts/all?locationId=${LOCATION_ID}&blogId=${blogId}&limit=${limit}&offset=${offset}`);
+    if (!r.ok) throw new Error(`GHL posts API ${r.status} (blogId=${blogId}): ${r.text.slice(0,300)}`);
+    const batch = r.json?.blogs || r.json?.posts || r.json?.data || [];
     out.push(...batch);
     if (batch.length < limit) break;
     offset += limit;
@@ -39,9 +54,16 @@ function isLive(p) {
 }
 
 const now = new Date().toISOString();
+
+const discovered = await discoverBlogId();
+if (discovered) { console.log(`[discover] using blogId=${discovered}`); BLOG_ID = discovered; }
+else { console.log(`[discover] could not auto-discover; falling back to blogId=${BLOG_ID}`); }
+
 let posts = [];
-try { posts = await fetchAllPosts(); }
+try { posts = await fetchAllPosts(BLOG_ID); }
 catch (e) { console.error("Failed to fetch GHL posts:", e.message); process.exit(1); }
+
+if (posts[0]) console.log(`[posts] sample fields:`, Object.keys(posts[0]).join(", "));
 
 const postUrls = posts.filter(isLive).map((p) => {
   const slug = p.urlSlug || p.url_slug || p.slug;
