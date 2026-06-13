@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- generated 2026-06-12T18:53:11.892Z | 1 posts + 9 pages -->
+<!-- generated 2026-06-13T02:37:50.857Z | 4 posts + 9 pages -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://powerpokerleague.com/</loc>
@@ -38,7 +38,19 @@
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://powerpokerleague.com/post/how-to-start-a-poker-league</loc>
+    <loc>https://powerpokerleague.com/post/poker-league-scoring-systems</loc>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://powerpokerleague.com/post/how-to-run-a-poker-tournament</loc>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://powerpokerleague.com/post/is-home-poker-legal</loc>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://powerpokerleague.com/post/how-to-grow-a-poker-league</loc>
     <priority>0.7</priority>
   </url>
 </urlset>
